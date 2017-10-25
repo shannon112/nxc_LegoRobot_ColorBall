@@ -1,0 +1,147 @@
+#define LIGHTSENSOR IN_2
+#define UltrasonicSENSOR IN_3
+#define rightWheel OUT_A
+#define leftWheel OUT_B
+#define arm OUT_C
+#define blueUpBound 40
+#define blueLowBound 30
+#define redLowBound 41
+#define redUpBound 50
+#define nearbyBall 15
+#define closetoBall 5
+
+int blueBallCounter=0;
+int redBallCounter=0;
+int fwdStartTime=0;
+int fwdStopTime=0;
+int backStartTime=0;
+int backStopTime=0;
+bool missionSuc=false;
+
+int carRotateSpeed=5;
+int carGoingSpeed=50;
+int sensorWait=5;
+
+//一開始要把arm擺在最低(角度 D)
+//這個sensor的角度是累加的ex:一直輸入20它會越舉越高
+
+int A=80;//角度A 最高 舉手
+int B=20;//角度B 次高 超音波前進
+int C=10;//角度C 低 偵測顏色
+int D=0;//角度D 最低 把球壓進去
+
+inline void initailSetup(){
+  TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
+  TextOut(1,LCD_LINE8,"GIVE ME A+ !!");
+  SetSensorLight(LIGHTSENSOR);
+  SetSensorLowspeed(UltrasonicSENSOR);
+}
+
+
+inline void detectBall(){
+  //手返回要偵測球的角度
+  RotateMotor(arm,50,B-D);//to角度B
+  //原地轉圈
+  OnFwd(rightWheel,carRotateSpeed);
+  OnRev(leftWheel,carRotateSpeed);
+  //超聲波掃有沒有東西是近的,有的話停下來確定方向 
+  while(SensorUS(UltrasonicSENSOR)>nearbyBall){
+    Wait(sensorWait);
+  }
+  Off(rightWheel);
+  Off(leftWheel);
+}
+
+
+inline void gotoBall(){
+  //前進到球前面時停止
+  fwdStartTime=CurrentTick();
+  OnFwd(rightWheel,carGoingSpeed);
+  OnFwd(leftWheel,carGoingSpeed);
+  while(SensorUS(UltrasonicSENSOR)>closetoBall){
+    Wait(sensorWait);
+  }
+  Off(rightWheel);
+  Off(leftWheel);
+  fwdStopTime=CurrentTick();
+  //手舉起來
+  RotateMotor(arm,50,A-B);//to角度A
+  //前進一點
+  RotateMotor(rightWheel,25,720);
+  RotateMotor(leftWheel,25,720);
+  //手放下到以便偵測的高度
+  RotateMotor(arm,50,-(A-C));//to角度C
+}
+
+
+inline void detectColor(){
+  if ((Sensor(LIGHTSENSOR) > blueLowBound)&&(Sensor(LIGHTSENSOR) < blueUpBound)) {
+    blueBallCounter++;
+    //手舉起來
+    RotateMotor(arm,10,A-C);//to角度A
+    //後退一點
+    RotateMotor(rightWheel,25,-720);
+    RotateMotor(leftWheel,25,-720);
+  }else{
+    //no ball detected
+    RotateMotor(arm,10,A-C);//to角度A
+    RotateMotor(rightWheel,25,-720);
+    RotateMotor(leftWheel,25,-720);
+  }
+  if ((Sensor(LIGHTSENSOR) > redLowBound)&&(Sensor(LIGHTSENSOR) < redUpBound)) {
+    redBallCounter++;
+    if(redBallCounter==1){
+      //手到底來把球塞進去
+      RotateMotor(arm,10,-(C-D));//to角度D
+      //後退一點
+      RotateMotor(rightWheel,25,-720);
+      RotateMotor(leftWheel,25,-720);
+      //手舉起來
+      RotateMotor(arm,10,A-D);//to角度A
+    }else if(redBallCounter==2){
+      //手維持這個姿勢
+      //後退一點
+      RotateMotor(rightWheel,25,-720);
+      RotateMotor(leftWheel,25,-720);
+    }
+  }else{
+    //no ball detected
+    RotateMotor(arm,10,A-C);//to角度A
+    RotateMotor(rightWheel,25,-720);
+    RotateMotor(leftWheel,25,-720);
+  }
+  if (redBallCounter==2) missionSuc=true;
+}
+
+
+inline void backtoHome(){
+  //後退回原點
+  backStartTime=CurrentTick();
+  OnRev(rightWheel,carGoingSpeed);
+  OnRev(leftWheel,carGoingSpeed);
+  int targetTime=fwdStopTime-fwdStartTime;
+  backStopTime=CurrentTick();
+  while((backStopTime-backStartTime)<targetTime){
+    backStopTime=CurrentTick();
+  }
+  Off(rightWheel);
+  Off(leftWheel);
+  RotateMotor(arm,10,-(A-D));//to角度D
+}
+
+
+task main(){
+  //一開始要把手放在壓進去的角度  角度D
+  initailSetup();
+  while(missionSuc==false)
+  {
+    detectBall();
+    gotoBall();
+    detectColor();
+    backtoHome();
+  }
+  TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
+  TextOut(1,LCD_LINE8,"MISSION OK!");
+}
+
+
