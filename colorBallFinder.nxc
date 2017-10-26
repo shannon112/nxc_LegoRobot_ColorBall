@@ -1,5 +1,5 @@
 #define LIGHTSENSOR IN_2
-#define UltrasonicSENSOR IN_3
+#define UltrasonicSENSOR IN_1
 #define rightWheel OUT_A
 #define leftWheel OUT_B
 #define arm OUT_C
@@ -7,8 +7,8 @@
 #define blueLowBound 30
 #define redLowBound 41
 #define redUpBound 50
-#define nearbyBall 15
-#define closetoBall 5
+#define nearbyBall 40
+#define closetoBall 10
 
 int blueBallCounter=0;
 int redBallCounter=0;
@@ -18,17 +18,17 @@ int backStartTime=0;
 int backStopTime=0;
 bool missionSuc=false;
 
-int carRotateSpeed=5;
-int carGoingSpeed=50;
+int carRotateSpeed=20;
+int carGoingSpeed=20;
 int sensorWait=5;
 
-//ä¸€é–‹å§‹è¦æŠŠarmæ“ºåœ¨æœ€ä½Ž(è§’åº¦ D)
-//é€™å€‹sensorçš„è§’åº¦æ˜¯ç´¯åŠ çš„ex:ä¸€ç›´è¼¸å…¥20å®ƒæœƒè¶Šèˆ‰è¶Šé«˜
+//¤@¶}©l­n§âarmÂ\¦b³Ì§C(¨¤«× D)
+//³o­Ósensorªº¨¤«×¬O²Ö¥[ªºex:¤@ª½¿é¤J20¥¦·|¶VÁ|¶V°ª
 
-int A=80;//è§’åº¦A æœ€é«˜ èˆ‰æ‰‹
-int B=20;//è§’åº¦B æ¬¡é«˜ è¶…éŸ³æ³¢å‰é€²
-int C=10;//è§’åº¦C ä½Ž åµæ¸¬é¡è‰²
-int D=0;//è§’åº¦D æœ€ä½Ž æŠŠçƒå£“é€²åŽ»
+int A=100;//¨¤«×A ³Ì°ª Á|¤â
+int B=20;//¨¤«×B ¦¸°ª °»´úÃC¦â
+int C=0;//¨¤«×C §C ¶W­µªi«e¶i
+int D=0;//¨¤«×D ³Ì§C §â²yÀ£¶i¥h
 
 inline void initailSetup(){
   TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
@@ -39,12 +39,12 @@ inline void initailSetup(){
 
 
 inline void detectBall(){
-  //æ‰‹è¿”å›žè¦åµæ¸¬çƒçš„è§’åº¦
-  RotateMotor(arm,50,B-D);//toè§’åº¦B
-  //åŽŸåœ°è½‰åœˆ
-  OnFwd(rightWheel,carRotateSpeed);
-  OnRev(leftWheel,carRotateSpeed);
-  //è¶…è²æ³¢æŽƒæœ‰æ²’æœ‰æ±è¥¿æ˜¯è¿‘çš„,æœ‰çš„è©±åœä¸‹ä¾†ç¢ºå®šæ–¹å‘ 
+  //¤âªð¦^­n°»´ú²yªº¨¤«×
+  RotateMotor(arm,50,-(C-D));//to¨¤«×C
+  //­ì¦aÂà°é
+  OnRev(rightWheel,carRotateSpeed);
+  OnFwd(leftWheel,carRotateSpeed);
+  //¶WÁnªi±½¦³¨S¦³ªF¦è¬Oªñªº,¦³ªº¸Ü°±¤U¨Ó½T©w¤è¦V
   while(SensorUS(UltrasonicSENSOR)>nearbyBall){
     Wait(sensorWait);
   }
@@ -54,59 +54,60 @@ inline void detectBall(){
 
 
 inline void gotoBall(){
-  //å‰é€²åˆ°çƒå‰é¢æ™‚åœæ­¢
+  //«e¶i¨ì²y«e­±®É°±¤î
   fwdStartTime=CurrentTick();
-  OnFwd(rightWheel,carGoingSpeed);
-  OnFwd(leftWheel,carGoingSpeed);
+  OnRev(rightWheel,carGoingSpeed);
+  OnRev(leftWheel,carGoingSpeed);
   while(SensorUS(UltrasonicSENSOR)>closetoBall){
+    TextOut(1,LCD_LINE2,NumToStr(SensorUS(UltrasonicSENSOR))+"  ");
     Wait(sensorWait);
   }
   Off(rightWheel);
   Off(leftWheel);
   fwdStopTime=CurrentTick();
-  //æ‰‹èˆ‰èµ·ä¾†
-  RotateMotor(arm,50,A-B);//toè§’åº¦A
-  //å‰é€²ä¸€é»ž
-  RotateMotor(rightWheel,25,720);
-  RotateMotor(leftWheel,25,720);
-  //æ‰‹æ”¾ä¸‹åˆ°ä»¥ä¾¿åµæ¸¬çš„é«˜åº¦
-  RotateMotor(arm,50,-(A-C));//toè§’åº¦C
+  //¤âÁ|°_¨Ó
+  RotateMotor(arm,100,-(A-C));//to¨¤«×A
+  //«e¶i¤@ÂI
+  OnRev(leftWheel,100);
+  OnRev(rightWheel,100);
+  Wait(400);
+  Off(leftWheel);
+  Off(rightWheel);
+  //¤â©ñ¤U¨ì¥H«K°»´úªº°ª«×
+  RotateMotor(arm,20,A-B);//to¨¤«×B
 }
 
 
 inline void detectColor(){
   if ((Sensor(LIGHTSENSOR) > blueLowBound)&&(Sensor(LIGHTSENSOR) < blueUpBound)) {
+    TextOut(1,LCD_LINE4,"BLUE"+NumToStr(Sensor(LIGHTSENSOR)));
     blueBallCounter++;
-    //æ‰‹èˆ‰èµ·ä¾†
-    RotateMotor(arm,10,A-C);//toè§’åº¦A
-    //å¾Œé€€ä¸€é»ž
+    //¤âÁ|°_¨Ó
+    RotateMotor(arm,10,-(A-B));//to¨¤«×A
+    //«á°h¤@ÂI
     RotateMotor(rightWheel,25,-720);
     RotateMotor(leftWheel,25,-720);
-  }else{
-    //no ball detected
-    RotateMotor(arm,10,A-C);//toè§’åº¦A
-    RotateMotor(rightWheel,25,-720);
-    RotateMotor(leftWheel,25,-720);
-  }
-  if ((Sensor(LIGHTSENSOR) > redLowBound)&&(Sensor(LIGHTSENSOR) < redUpBound)) {
+  }else if ((Sensor(LIGHTSENSOR) > redLowBound)&&(Sensor(LIGHTSENSOR) < redUpBound)) {
+    TextOut(1,LCD_LINE4,"RED"+NumToStr(Sensor(LIGHTSENSOR)));
     redBallCounter++;
     if(redBallCounter==1){
-      //æ‰‹åˆ°åº•ä¾†æŠŠçƒå¡žé€²åŽ»
-      RotateMotor(arm,10,-(C-D));//toè§’åº¦D
-      //å¾Œé€€ä¸€é»ž
+      //¤â¨ì©³¨Ó§â²y¶ë¶i¥h
+      RotateMotor(arm,10,B-D);//to¨¤«×D
+      //«á°h¤@ÂI
       RotateMotor(rightWheel,25,-720);
       RotateMotor(leftWheel,25,-720);
-      //æ‰‹èˆ‰èµ·ä¾†
-      RotateMotor(arm,10,A-D);//toè§’åº¦A
+      //¤âÁ|°_¨Ó
+      RotateMotor(arm,10,-(A-B));//to¨¤«×A
     }else if(redBallCounter==2){
-      //æ‰‹ç¶­æŒé€™å€‹å§¿å‹¢
-      //å¾Œé€€ä¸€é»ž
+      //¤âºû«ù³o­Ó«º¶Õ
+      //«á°h¤@ÂI
       RotateMotor(rightWheel,25,-720);
       RotateMotor(leftWheel,25,-720);
     }
   }else{
+    TextOut(1,LCD_LINE4,"NO BALL"+NumToStr(Sensor(LIGHTSENSOR)));
     //no ball detected
-    RotateMotor(arm,10,A-C);//toè§’åº¦A
+    RotateMotor(arm,40,-(A-B));//to¨¤«×A
     RotateMotor(rightWheel,25,-720);
     RotateMotor(leftWheel,25,-720);
   }
@@ -115,10 +116,10 @@ inline void detectColor(){
 
 
 inline void backtoHome(){
-  //å¾Œé€€å›žåŽŸé»ž
+  //«á°h¦^­ìÂI
   backStartTime=CurrentTick();
-  OnRev(rightWheel,carGoingSpeed);
-  OnRev(leftWheel,carGoingSpeed);
+  OnFwd(rightWheel,carGoingSpeed);
+  OnFwd(leftWheel,carGoingSpeed);
   int targetTime=fwdStopTime-fwdStartTime;
   backStopTime=CurrentTick();
   while((backStopTime-backStartTime)<targetTime){
@@ -126,12 +127,12 @@ inline void backtoHome(){
   }
   Off(rightWheel);
   Off(leftWheel);
-  RotateMotor(arm,10,-(A-D));//toè§’åº¦D
+  RotateMotor(arm,10,(A-D));//to¨¤«×D
 }
 
 
 task main(){
-  //ä¸€é–‹å§‹è¦æŠŠæ‰‹æ”¾åœ¨å£“é€²åŽ»çš„è§’åº¦  è§’åº¦D
+  //¤@¶}©l­n§â¤â©ñ¦bÀ£¶i¥hªº¨¤«×  ¨¤«×D
   initailSetup();
   while(missionSuc==false)
   {
@@ -143,5 +144,4 @@ task main(){
   TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
   TextOut(1,LCD_LINE8,"MISSION OK!");
 }
-
 
