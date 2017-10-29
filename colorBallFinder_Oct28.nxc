@@ -6,38 +6,34 @@
 #define arm OUT_C
 #define blueUpBound 41
 #define blueLowBound 30
-#define redLowBound 40
+#define redLowBound 45
 #define redUpBound 65
-#define nearbyBall 25
+#define nearbyBall 40
 #define closetoBall 15
+#define errorBall 30
 
-int blueBallCounter=0;
-int redBallCounter=0;
-int fwdStartTime=0;
-int fwdStopTime=0;
-int minusStopTime=0;
-int backStartTime=0;
-int backStopTime=0;
-bool missionSuc=false;
-
-int carRotateSpeed=20;
-int carGoingSpeed=40;
-int sensorWait=1;
-int rotation_time=0;
 
 //一開始要把arm擺在最低(角度 D)
 //這個sensor的角度是累加的ex:一直輸入20它會越舉越高
 
 int A=100;//角度A 最高 舉手
-int B=25 ;//角度B 次高 偵測顏色
-int C=0;//角度C 低 超音波前進
-int D=0;//角度D 最低 把球壓進去
+int B=25;//角度B 次高 偵測顏色
+         //角度C 次低 由於與D相近暫時刪除
+int D=15;//角度D 最低 把球壓進去
 int lastTime=100;
 int lastSecond=100;
 int iteration=0;
 int iteration2=0;
 bool toHome=false;
-
+int carRotateSpeed=20;
+int carGoingSpeed=40;
+int fwdStartTime=0;
+int fwdStopTime=0;
+int redBallCounter=0;
+int blueBallCounter=0;
+int missionSuc=0;
+int backStartTime=0;
+int backStopTime=0;
 inline void initailSetup(){
   TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
   TextOut(1,LCD_LINE8,"GIVE ME A+ !!");
@@ -45,170 +41,108 @@ inline void initailSetup(){
   SetSensorLowspeed(UltrasonicSENSOR);
 }
 
-
 inline void detectBall(){
-  //手返回要偵測球的角度
-  //RotateMotor(arm,70,-(C-D));//to角度C
   //原地轉圈
-  int rotation_start=CurrentTick();
   OnFwd(rightWheel,carRotateSpeed);
   OnRev(leftWheel,carRotateSpeed);
   //超聲波掃有沒有東西是近的,有的話停下來確定方向
-  //當數字遞減時才會觸發
   while(SensorUS(UltrasonicSENSOR)>nearbyBall){
-    /*OnFwd(rightWheel,carRotateSpeed);
-    OnRev(leftWheel,carRotateSpeed);
-    Wait(500);
-    OnRev(rightWheel,carRotateSpeed);
-    OnFwd(leftWheel,carRotateSpeed);
-    Wait(200);
-     */
     TextOut(1,LCD_LINE2,NumToStr(SensorUS(UltrasonicSENSOR))+"  ");
-    lastTime=SensorUS(UltrasonicSENSOR);
-    Wait(sensorWait);
+    Wait(50);
   }
-  Wait(1000);
-  Off(rightWheel);
-  Off(leftWheel);
-  int rotation_end=CurrentTick();
-  int rotation_time=rotation_time+(rotation_end-rotation_start) ;
-  //記下正轉時的時間
+  Off(twoWheel);
 }
 
 
 inline void gotoBall(){
   //前進到球前面時停止
-  fwdStartTime=CurrentTick();
-  OnRev(rightWheel,carGoingSpeed);
-  OnRev(leftWheel,carGoingSpeed);
+  OnRev(twoWheel,carGoingSpeed);
+  Wait(200);
+  int lastTime=SensorUS(UltrasonicSENSOR);
   while(SensorUS(UltrasonicSENSOR)>closetoBall){
-     TextOut(1,LCD_LINE2,NumToStr(SensorUS(UltrasonicSENSOR))+"  ");
-      int t1=SensorUS(UltrasonicSENSOR);
+      //此處使用PID控制，Ki尚未使用，Kp=0.8,Kd=0
+      int error=(SensorUS(UltrasonicSENSOR)-closetoBall)*0.8;
+      TextOut(1,LCD_LINE4,"PID error: "+NumToStr(error));
+      int diff_error=(error-lastTime)*0;
+      lastTime=error;
+      OnRev(rightWheel,carGoingSpeed-error-diff_error);
+      OnRev(leftWheel,carGoingSpeed+error+diff_error);
       Wait(10);
-      int t2=SensorUS(UltrasonicSENSOR);
-      if(t2-t1<-3)iteration2++;
-    if(SensorUS(UltrasonicSENSOR)>50){
-      TextOut(1,LCD_LINE6,"DISTANCE ERROR"+NumToStr(SensorUS(UltrasonicSENSOR))+"  ");
-      Off(twoWheel);
-      int tmpStopTime=CurrentTick();
-      detectBall();
-      minusStopTime=minusStopTime+CurrentTick()-tmpStopTime;
-      /*toHome=true;
-      return;*/
-      }
-    TextOut(1,LCD_LINE2,NumToStr(SensorUS(UltrasonicSENSOR))+"  ");
-    Wait(sensorWait);
   }
-  fwdStopTime=CurrentTick()-fwdStartTime-minusStopTime;
-  Off(rightWheel);
-  Off(leftWheel);
-  fwdStopTime=CurrentTick();
-  //手舉起來
-  RotateMotor(arm,80,-(A-C));//to角度A
+  //PID控制到球附近,為避免手臂撞飛彩球先後退
+  OnFwd(twoWheel,carGoingSpeed);
+  Wait(500);
+  //微控制右轉(經驗)
+  OnFwd(rightWheel,carRotateSpeed);
+  OnRev(leftWheel,carRotateSpeed);
+  Wait(150);
+  //前進抓球
+  OnRev(twoWheel,carGoingSpeed);
+  RotateMotor(arm,80,D-A);//to角度A
+  //這行可以避免手臂下滑
   OnFwdReg(arm,0,OUT_REGMODE_SPEED);
-  //前進一點
-  RotateMotorEx(twoWheel,50,-270,0,true,false);
-  Off(leftWheel);
-  Off(rightWheel);
-  //手放下到以便偵測的高度
-  RotateMotor(arm,20,A-B);
+  Wait(500);
+  Off(arm);
+  //讓手臂先套住球後車子在停止，避免把球撞開
+  Wait(100);
+  Off(twoWheel);
+  RotateMotor(arm,40,A-B);
+  Off(twoWheel);
 }
 
 
 inline void detectColor(){
-  Wait(1500);
+  Wait(1000);
   if ((Sensor(LIGHTSENSOR) > redLowBound)&&(Sensor(LIGHTSENSOR) < redUpBound)) {
+    //偵測到紅球
     TextOut(1,LCD_LINE4,"RED BALL: "+NumToStr(Sensor(LIGHTSENSOR)));
     redBallCounter++;
     if(redBallCounter==1){
       //手舉起來把球敲進去
-      //RotateMotor(arm,90,B-A);//to角度A
-      //RotateMotor(arm,90,A-D);//to角度D
-      RotateMotor(arm,90,-15);
-      RotateMotor(arm,90,15);
-      RotateMotor(arm,90,-15);
-      RotateMotor(arm,90,15);
-      RotateMotor(arm,90,-15);
-      RotateMotor(arm,90,15);
-      RotateMotor(arm,90,B-D);
-
-      //後退一點
-      //手舉起來
+      RotateMotor(arm,90,B-A/2);
+      RotateMotor(arm,100,A/2-D);
     }else if(redBallCounter==2){
-      //手維持這個姿勢
-      //後退一點
+      //偵測到第二顆紅球,不用敲球
       TextOut(1,LCD_LINE5,"SECOND RED BALL FOUND!");
-
     }
-      RotateMotorEx(twoWheel,40,270,0,true,false);
+    //抓到球後後退
+      RotateMotorEx(twoWheel,50,270,0,true,false);
     }
-  //if ((Sensor(LIGHTSENSOR) > blueLowBound)&&(Sensor(LIGHTSENSOR) < blueUpBound)) {
   else {
+  //偵測到藍球或沒有球
     TextOut(1,LCD_LINE4,"WRONG: "+NumToStr(Sensor(LIGHTSENSOR)));
-    blueBallCounter++;
     //手舉起來
-    RotateMotor(arm,80,-(A-B));//to角度A
+    RotateMotor(arm,80,B-A);//to角度A
     OnFwdReg(arm,0,OUT_REGMODE_SPEED);
     //後退一點
     RotateMotorEx(twoWheel,50,270,0,true,false);
-    RotateMotor(arm,30,(A-D));//to角度D
-    //RotateMotorEx(twoWheel,50,-180,0,true,false);
+    //手臂下降
+    RotateMotor(arm,50,(A-D));//to角度D
   }
-  /*else{
-    TextOut(1,LCD_LINE4,"NO BALL"+NumToStr(Sensor(LIGHTSENSOR)));
-    //no ball detected
-    RotateMotor(arm,40,-(A-B));//to角度A
-    RotateMotor(rightWheel,25,-720);
-    RotateMotor(leftWheel,25,-720);
-  } */
   if (redBallCounter==2) {
   missionSuc=true;
-  
   }
 }
 
 
 inline void backtoHome(){
-  //持續反轉正轉時的時間
-  OnRev(rightWheel,carRotateSpeed);
-  OnFwd(leftWheel,carRotateSpeed);
-  //後退回原點
-  backStartTime=CurrentTick();
-  OnFwd(rightWheel,carGoingSpeed);
-  OnFwd(leftWheel,carGoingSpeed);
-  int targetTime=500;
-  //int targetTime=fwdStopTime-fwdStartTime;   先不要記錄前進時間
-  backStopTime=CurrentTick();
-  while((backStopTime-backStartTime)<targetTime){
-    backStopTime=CurrentTick();
-  }
-  Off(rightWheel);
-  Off(leftWheel);
-  //OnFwd(rightWheel,carRotateSpeed);
-  //OnRev(leftWheel,carRotateSpeed);      .........
-  //Wait(500);
-  //Off(twoWheel);   .................
-  //toHome=false;       ..............................
-  iteration2=0;
+  //此處經驗法則,待改善
+  OnFwd(twoWheel,carGoingSpeed);
+  Wait(800);
+  Off(twoWheel);
 }
 
 
 task main(){
   //一開始要把手放在壓進去的角度  角度D
   initailSetup();
-  RotateMotor(rightWheel,25,-720);
-  RotateMotor(leftWheel,25,-720);
   while(missionSuc==false)
   {
     detectBall();
     gotoBall();
-    if(!toHome){
     detectColor();
-    RotateMotor(rightWheel,25,360);
-    RotateMotor(leftWheel,25,360);
-    }
+    backtoHome();
   }
-  backtoHome() ;
   TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
   TextOut(1,LCD_LINE8,"MISSION OK!");
 }
