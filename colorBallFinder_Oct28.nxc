@@ -23,6 +23,7 @@ bool missionSuc=false;
 int carRotateSpeed=20;
 int carGoingSpeed=40;
 int sensorWait=1;
+int rotation_time=0;
 
 //一開始要把arm擺在最低(角度 D)
 //這個sensor的角度是累加的ex:一直輸入20它會越舉越高
@@ -49,6 +50,7 @@ inline void detectBall(){
   //手返回要偵測球的角度
   //RotateMotor(arm,70,-(C-D));//to角度C
   //原地轉圈
+  int rotation_start=CurrentTick();
   OnFwd(rightWheel,carRotateSpeed);
   OnRev(leftWheel,carRotateSpeed);
   //超聲波掃有沒有東西是近的,有的話停下來確定方向
@@ -68,6 +70,9 @@ inline void detectBall(){
   Wait(1000);
   Off(rightWheel);
   Off(leftWheel);
+  int rotation_end=CurrentTick();
+  int rotation_time=rotation_time+(rotation_end-rotation_start) ;
+  //記下正轉時的時間
 }
 
 
@@ -156,27 +161,34 @@ inline void detectColor(){
     RotateMotor(rightWheel,25,-720);
     RotateMotor(leftWheel,25,-720);
   } */
-  if (redBallCounter==2) missionSuc=true;
+  if (redBallCounter==2) {
+  missionSuc=true;
+  
+  }
 }
 
 
 inline void backtoHome(){
+  //持續反轉正轉時的時間
+  OnRev(rightWheel,carRotateSpeed);
+  OnFwd(leftWheel,carRotateSpeed);
   //後退回原點
   backStartTime=CurrentTick();
   OnFwd(rightWheel,carGoingSpeed);
   OnFwd(leftWheel,carGoingSpeed);
-  int targetTime=fwdStopTime-fwdStartTime;
+  int targetTime=500;
+  //int targetTime=fwdStopTime-fwdStartTime;   先不要記錄前進時間
   backStopTime=CurrentTick();
   while((backStopTime-backStartTime)<targetTime){
     backStopTime=CurrentTick();
   }
   Off(rightWheel);
   Off(leftWheel);
-  OnFwd(rightWheel,carRotateSpeed);
-  OnRev(leftWheel,carRotateSpeed);
-  Wait(500);
-  Off(twoWheel);
-  toHome=false;
+  //OnFwd(rightWheel,carRotateSpeed);
+  //OnRev(leftWheel,carRotateSpeed);      .........
+  //Wait(500);
+  //Off(twoWheel);   .................
+  //toHome=false;       ..............................
   iteration2=0;
 }
 
@@ -184,13 +196,19 @@ inline void backtoHome(){
 task main(){
   //一開始要把手放在壓進去的角度  角度D
   initailSetup();
+  RotateMotor(rightWheel,25,-720);
+  RotateMotor(leftWheel,25,-720);
   while(missionSuc==false)
   {
     detectBall();
     gotoBall();
-    if(!toHome)detectColor();
-    backtoHome();
+    if(!toHome){
+    detectColor();
+    RotateMotor(rightWheel,25,360);
+    RotateMotor(leftWheel,25,360);
+    }
   }
+  backtoHome() ;
   TextOut(1,LCD_LINE7,"NTUME ROBOTIC");
   TextOut(1,LCD_LINE8,"MISSION OK!");
 }
